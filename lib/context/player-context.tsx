@@ -10,10 +10,7 @@ import React, {
   ReactNode,
 } from "react";
 import { Track, Playlist } from "@/lib/types/music";
-import {
-  INITIAL_RECENT_TRACKS,
-  INITIAL_TOP_SONGS,
-} from "@/lib/data/initial-music";
+import { INITIAL_RECENT_TRACKS } from "@/lib/data/initial-music";
 import { useMusicStore } from "@/lib/store/useMusicStore";
 
 interface YouTubePlayerInstance {
@@ -75,8 +72,10 @@ interface PlayerContextType {
   queue: Track[];
   favorites: string[];
   playlists: Playlist[];
+  isShuffle: boolean;
+  repeatMode: "off" | "all" | "one";
   handleTogglePlay: () => void;
-  handleSelectTrack: (track: Track) => void;
+  handleSelectTrack: (track: Track, contextList?: Track[]) => void;
   handleNextTrack: () => void;
   handlePrevTrack: () => void;
   handleSeek: (seconds: number) => void;
@@ -84,6 +83,8 @@ interface PlayerContextType {
   handleToggleFavorite: (trackId: string) => void;
   handleNewPlaylist: () => void;
   handleAddToQueue: (track: Track) => void;
+  handleToggleShuffle: () => void;
+  handleCycleRepeatMode: () => void;
 }
 
 const SILENT_AUDIO_URI =
@@ -98,13 +99,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const favorites = useMusicStore((state) => state.favorites);
   const storeTrack = useMusicStore((state) => state.currentTrack);
   const storeVolume = useMusicStore((state) => state.volume);
+  const isShuffle = useMusicStore((state) => state.isShuffle);
+  const repeatMode = useMusicStore((state) => state.repeatMode);
   const addToQueue = useMusicStore((state) => state.addToQueue);
   const popNextQueue = useMusicStore((state) => state.popNextQueue);
+  const popRandomQueue = useMusicStore((state) => state.popRandomQueue);
   const toggleFavoriteStore = useMusicStore((state) => state.toggleFavorite);
   const createPlaylist = useMusicStore((state) => state.createPlaylist);
   const setStoreCurrentTrack = useMusicStore((state) => state.setCurrentTrack);
   const setStoreLastProgressSec = useMusicStore((state) => state.setLastProgressSec);
   const setStoreVolume = useMusicStore((state) => state.setVolume);
+  const toggleShuffleStore = useMusicStore((state) => state.toggleShuffle);
+  const cycleRepeatModeStore = useMusicStore((state) => state.cycleRepeatMode);
 
   // Active Playback State
   const currentTrack: Track = storeTrack || INITIAL_RECENT_TRACKS[3];
@@ -125,6 +131,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const volumeRef = useRef<number>(volume);
   const initialTrackIdRef = useRef<string>(currentTrack?.youtubeId || "UNo0TG9LwwI");
   const initialProgressRef = useRef<number>(0);
+  const isShuffleRef = useRef<boolean>(isShuffle);
+  const repeatModeRef = useRef<"off" | "all" | "one">(repeatMode);
+  const lastVolumeRef = useRef<number>(volume > 0 ? volume : 80);
+
+  useEffect(() => {
+    isShuffleRef.current = isShuffle;
+  }, [isShuffle]);
+
+  useEffect(() => {
+    repeatModeRef.current = repeatMode;
+  }, [repeatMode]);
+
+  useEffect(() => {
+    if (volume > 0) {
+      lastVolumeRef.current = volume;
+    }
+  }, [volume]);
 
   useEffect(() => {
     volumeRef.current = volume;
@@ -178,40 +201,62 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
-  // Next Track handler - pops from persisted queue first, otherwise loops feed
+  // Next Track handler - handles shuffle, repeat mode, and queue
   const handleNextTrack = useCallback(() => {
     let nextSong: Track;
-    const poppedQueueTrack = popNextQueue();
-    if (poppedQueueTrack) {
-      nextSong = poppedQueueTrack;
-    } else {
-      const allTracks = [...INITIAL_RECENT_TRACKS, ...INITIAL_TOP_SONGS];
-      const currentIndex = allTracks.findIndex((t) => t.id === currentTrack?.id);
-      const nextIndex = (currentIndex + 1) % allTracks.length;
-      nextSong = allTracks[nextIndex];
-    }
+      const poppedQueueTrack = isShuffleRef.current ? popRandomQueue() : popNextQueue();
 
-    setStoreCurrentTrack(nextSong);
-    setProgressSec(0);
-    setStoreLastProgressSec(0);
-    setDurationSec(nextSong.durationSec || 240);
-    setIsPlaying(true);
-    hasResumedPlaybackRef.current = true;
+      if (poppedQueueTrack) {
+        nextSong = poppedQueueTrack;
+      } else {
+        const store = useMusicStore.getState();
+        const activeList =
+          store.currentTracklist.length > 0
+            ? store.currentTracklist
+            : store.allKnownTracks;
 
-    if (isPlayerReadyRef.current && ytPlayerRef.current && nextSong.youtubeId) {
-      try {
-        ytPlayerRef.current.unMute?.();
-        ytPlayerRef.current.setVolume(volumeRef.current);
-        ytPlayerRef.current.loadVideoById(nextSong.youtubeId);
-        ytPlayerRef.current.setPlaybackQuality?.("small");
-        ytPlayerRef.current.playVideo();
-      } catch (err) {
-        console.warn("YouTube play error:", err);
+        if (isShuffleRef.current) {
+          nextSong = store.getRandomTrack(currentTrack?.id);
+        } else {
+          const currentIndex = activeList.findIndex(
+            (t) =>
+              t.id === currentTrack?.id ||
+              (t.youtubeId && t.youtubeId === currentTrack?.youtubeId),
+          );
+
+          if (currentIndex !== -1 && currentIndex + 1 < activeList.length) {
+            nextSong = activeList[currentIndex + 1];
+          } else if (repeatModeRef.current === "all" && activeList.length > 0) {
+            nextSong = activeList[0];
+          } else {
+            nextSong = store.getRandomTrack(currentTrack?.id);
+          }
+        }
       }
-    } else {
-      pendingPlayRef.current = true;
-    }
-  }, [popNextQueue, currentTrack, setStoreCurrentTrack, setStoreLastProgressSec]);
+
+      setStoreCurrentTrack(nextSong);
+      setProgressSec(0);
+      setStoreLastProgressSec(0);
+      setDurationSec(nextSong.durationSec || 240);
+      setIsPlaying(true);
+      hasResumedPlaybackRef.current = true;
+
+      if (isPlayerReadyRef.current && ytPlayerRef.current && nextSong.youtubeId) {
+        try {
+          ytPlayerRef.current.unMute?.();
+          ytPlayerRef.current.setVolume(volumeRef.current);
+          ytPlayerRef.current.loadVideoById(nextSong.youtubeId);
+          ytPlayerRef.current.setPlaybackQuality?.("small");
+          ytPlayerRef.current.playVideo();
+        } catch (err) {
+          console.warn("YouTube play error:", err);
+        }
+      } else {
+        pendingPlayRef.current = true;
+      }
+    },
+    [popNextQueue, popRandomQueue, currentTrack, setStoreCurrentTrack, setStoreLastProgressSec]
+  );
 
   useEffect(() => {
     handleNextTrackRef.current = handleNextTrack;
@@ -275,7 +320,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
               } else if (event.data === 2) {
                 setIsPlaying(false);
               } else if (event.data === 0) {
-                handleNextTrackRef.current();
+                if (repeatModeRef.current === "one") {
+                  event.target.seekTo(0, true);
+                  event.target.playVideo();
+                  setProgressSec(0);
+                  useMusicStore.getState().setLastProgressSec(0);
+                  setIsPlaying(true);
+                } else {
+                  handleNextTrackRef.current();
+                }
               }
             },
             onError: (event: YouTubeEvent) => {
@@ -310,12 +363,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Prev Track handler
+  // Prev Track handler - rewinds if > 3s, otherwise chooses previous track (with shuffle support)
   const handlePrevTrack = useCallback(() => {
-    const allTracks = [...INITIAL_RECENT_TRACKS, ...INITIAL_TOP_SONGS];
-    const currentIndex = allTracks.findIndex((t) => t.id === currentTrack?.id);
-    const prevIndex = (currentIndex - 1 + allTracks.length) % allTracks.length;
-    const prevSong = allTracks[prevIndex];
+    if (progressSec > 3 && isPlayerReadyRef.current && ytPlayerRef.current) {
+      ytPlayerRef.current.seekTo(0, true);
+      setProgressSec(0);
+      setStoreLastProgressSec(0);
+      return;
+    }
+
+    const store = useMusicStore.getState();
+    const activeList =
+      store.currentTracklist.length > 0
+        ? store.currentTracklist
+        : store.allKnownTracks;
+
+    let prevSong: Track;
+
+    if (isShuffleRef.current) {
+      prevSong = store.getRandomTrack(currentTrack?.id);
+    } else {
+      const currentIndex = activeList.findIndex(
+        (t) =>
+          t.id === currentTrack?.id ||
+          (t.youtubeId && t.youtubeId === currentTrack?.youtubeId),
+      );
+
+      if (currentIndex > 0) {
+        prevSong = activeList[currentIndex - 1];
+      } else if (currentIndex === 0) {
+        prevSong = activeList[activeList.length - 1];
+      } else {
+        prevSong = store.getRandomTrack(currentTrack?.id);
+      }
+    }
 
     setStoreCurrentTrack(prevSong);
     setProgressSec(0);
@@ -337,31 +418,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } else {
       pendingPlayRef.current = true;
     }
-  }, [currentTrack, setStoreCurrentTrack, setStoreLastProgressSec]);
+  }, [progressSec, currentTrack, setStoreCurrentTrack, setStoreLastProgressSec]);
 
-  // Select Track to Play (Full Length)
-  const handleSelectTrack = useCallback((track: Track) => {
-    setStoreCurrentTrack(track);
-    setIsPlaying(true);
-    setProgressSec(0);
-    setStoreLastProgressSec(0);
-    setDurationSec(track.durationSec || 240);
-    hasResumedPlaybackRef.current = true;
-
-    if (isPlayerReadyRef.current && ytPlayerRef.current && track.youtubeId) {
-      try {
-        ytPlayerRef.current.unMute?.();
-        ytPlayerRef.current.setVolume(volumeRef.current);
-        ytPlayerRef.current.loadVideoById(track.youtubeId);
-        ytPlayerRef.current.setPlaybackQuality?.("small");
-        ytPlayerRef.current.playVideo();
-      } catch (err) {
-        console.warn("YouTube play failed:", err);
+  // Select Track to Play (with optional active playback context list)
+  const handleSelectTrack = useCallback(
+    (track: Track, contextList?: Track[]) => {
+      if (contextList && contextList.length > 0) {
+        useMusicStore.getState().setCurrentTracklist(contextList);
+      } else {
+        useMusicStore.getState().registerTracks([track]);
       }
-    } else {
-      pendingPlayRef.current = true;
-    }
-  }, [setStoreCurrentTrack, setStoreLastProgressSec]);
+
+      setStoreCurrentTrack(track);
+      setIsPlaying(true);
+      setProgressSec(0);
+      setStoreLastProgressSec(0);
+      setDurationSec(track.durationSec || 240);
+      hasResumedPlaybackRef.current = true;
+
+      if (isPlayerReadyRef.current && ytPlayerRef.current && track.youtubeId) {
+        try {
+          ytPlayerRef.current.unMute?.();
+          ytPlayerRef.current.setVolume(volumeRef.current);
+          ytPlayerRef.current.loadVideoById(track.youtubeId);
+          ytPlayerRef.current.setPlaybackQuality?.("small");
+          ytPlayerRef.current.playVideo();
+        } catch (err) {
+          console.warn("YouTube play failed:", err);
+        }
+      } else {
+        pendingPlayRef.current = true;
+      }
+    },
+    [setStoreCurrentTrack, setStoreLastProgressSec]
+  );
 
   // Toggle Play / Pause
   const handleTogglePlay = useCallback(() => {
@@ -603,6 +693,76 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [handleTogglePlay, handlePrevTrack, handleNextTrack, handleSeek, progressSec, durationSec]);
 
+  // Global Keyboard Shortcuts (Space, Arrows, M, S, R, L)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement | null;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.isContentEditable)
+      ) {
+        return; // Do not trigger shortcuts when typing in search or form inputs
+      }
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          handleTogglePlay();
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          handleSeek(Math.min(durationSec, progressSec + 5));
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          handleSeek(Math.max(0, progressSec - 5));
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          handleVolumeChange(Math.min(100, volume + 5));
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          handleVolumeChange(Math.max(0, volume - 5));
+          break;
+        case "KeyM":
+          e.preventDefault();
+          handleVolumeChange(volume === 0 ? (lastVolumeRef.current || 80) : 0);
+          break;
+        case "KeyS":
+          e.preventDefault();
+          toggleShuffleStore();
+          break;
+        case "KeyR":
+          e.preventDefault();
+          cycleRepeatModeStore();
+          break;
+        case "KeyL":
+          if (currentTrack) {
+            e.preventDefault();
+            handleToggleFavorite(currentTrack.id);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handleTogglePlay,
+    handleSeek,
+    handleVolumeChange,
+    toggleShuffleStore,
+    cycleRepeatModeStore,
+    handleToggleFavorite,
+    currentTrack,
+    progressSec,
+    durationSec,
+    volume,
+  ]);
+
   return (
     <PlayerContext.Provider
       value={{
@@ -614,6 +774,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         queue,
         favorites,
         playlists,
+        isShuffle,
+        repeatMode,
         handleTogglePlay,
         handleSelectTrack,
         handleNextTrack,
@@ -623,6 +785,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         handleToggleFavorite,
         handleNewPlaylist,
         handleAddToQueue,
+        handleToggleShuffle: toggleShuffleStore,
+        handleCycleRepeatMode: cycleRepeatModeStore,
       }}
     >
       {children}

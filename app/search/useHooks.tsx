@@ -50,7 +50,11 @@ export function useSearch() {
       const res = await fetch(`/api/music/search?q=${encodeURIComponent(trimmed)}`);
       if (res.ok) {
         const data = await res.json();
-        setResults(data.results || []);
+        const searchTracks: Track[] = data.results || [];
+        setResults(searchTracks);
+        if (searchTracks.length > 0) {
+          useMusicStore.getState().registerTracks(searchTracks);
+        }
       } else {
         setResults([]);
       }
@@ -74,7 +78,11 @@ export function useSearch() {
           const res = await fetch(`/api/music/search?q=${encodeURIComponent(q ?? "")}`);
           if (res.ok && active) {
             const data = await res.json();
-            setResults(data.results || []);
+            const searchTracks: Track[] = data.results || [];
+            setResults(searchTracks);
+            if (searchTracks.length > 0) {
+              useMusicStore.getState().registerTracks(searchTracks);
+            }
           }
         } catch {
           if (active) setResults([]);

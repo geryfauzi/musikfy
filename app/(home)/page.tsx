@@ -114,7 +114,9 @@ export default function HomePage() {
               currentTrackId={currentTrack?.id}
               isPlaying={isPlaying}
               onBack={() => setActiveTab("home")}
-              onSelectTrack={handleSelectTrack}
+              onSelectTrack={(track) =>
+                handleSelectTrack(track, selectedPlaylist.tracks)
+              }
               onEditPlaylist={(pl) => setEditingPlaylist(pl)}
               onDeletePlaylist={(pl) => setDeletingPlaylist(pl)}
               onOpenAddToPlaylist={(track) => setAddToPlaylistTrack(track)}
@@ -127,7 +129,9 @@ export default function HomePage() {
                 tracks={recentTracks}
                 currentTrackId={currentTrack?.id}
                 isPlaying={isPlaying}
-                onSelectTrack={handleSelectTrack}
+                onSelectTrack={(track) =>
+                  handleSelectTrack(track, recentTracks)
+                }
               />
 
               {/* Section 2: Two-column split for Top 10 songs & Videos */}
@@ -139,7 +143,9 @@ export default function HomePage() {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favorites={favorites}
-                    onSelectTrack={handleSelectTrack}
+                    onSelectTrack={(track) =>
+                      handleSelectTrack(track, topSongs)
+                    }
                     onToggleFavorite={handleToggleFavorite}
                     onOpenAddToPlaylist={(track) => setAddToPlaylistTrack(track)}
                   />
@@ -150,7 +156,7 @@ export default function HomePage() {
                   <FeaturedVideos
                     videos={featuredVideos}
                     onSelectVideo={(v) => {
-                      handleSelectTrack({
+                      const videoTrack = {
                         id: `video-${v.id}`,
                         title: v.title,
                         artist: v.artist,
@@ -158,7 +164,8 @@ export default function HomePage() {
                         duration: v.duration || "03:45",
                         durationSec: 225,
                         youtubeId: v.youtubeId,
-                      });
+                      };
+                      handleSelectTrack(videoTrack, [videoTrack, ...topSongs]);
                     }}
                   />
                 </div>

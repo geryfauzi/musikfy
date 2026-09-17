@@ -5,6 +5,9 @@ import {
   Pause,
   SkipBack,
   SkipForward,
+  Shuffle,
+  Repeat,
+  Repeat1,
   Volume2,
   VolumeX,
   Maximize2,
@@ -45,6 +48,10 @@ export function PlayerBar({
   const queue = useMusicStore((state) => state.queue);
   const isQueueOpen = useMusicStore((state) => state.isQueueOpen);
   const toggleQueueOpen = useMusicStore((state) => state.toggleQueueOpen);
+  const isShuffle = useMusicStore((state) => state.isShuffle);
+  const repeatMode = useMusicStore((state) => state.repeatMode);
+  const toggleShuffle = useMusicStore((state) => state.toggleShuffle);
+  const cycleRepeatMode = useMusicStore((state) => state.cycleRepeatMode);
 
   if (!currentTrack) return null;
 
@@ -99,21 +106,39 @@ export function PlayerBar({
         </div>
 
         {/* Center: Playback Controls */}
-        <div className="flex items-center justify-center gap-3 shrink-0 sm:w-1/3">
+        <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 shrink-0 sm:w-1/3">
+          {/* Shuffle Button */}
+          <button
+            onClick={toggleShuffle}
+            aria-label={isShuffle ? "Matikan acak (S)" : "Nyalakan acak (S)"}
+            title={isShuffle ? "Acak: Aktif (S)" : "Acak: Nonaktif (S)"}
+            className={`relative flex size-8 sm:size-9 items-center justify-center rounded-full transition-all cursor-pointer ${
+              isShuffle
+                ? "text-emerald-400 hover:text-emerald-300"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Shuffle className="size-4" />
+            {isShuffle && (
+              <span className="absolute bottom-1 size-1 rounded-full bg-emerald-400" />
+            )}
+          </button>
+
           <Button
             variant="ghost"
             size="icon"
             onClick={onPrev}
             aria-label="Lagu sebelumnya"
-            className="size-9 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
+            className="size-8 sm:size-9 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
           >
-            <SkipBack className="size-4.5" />
+            <SkipBack className="size-4 sm:size-4.5" />
           </Button>
 
           <button
             onClick={onTogglePlay}
-            aria-label={isPlaying ? "Jeda pemutaran" : "Mulai pemutaran"}
-            className="flex size-11 items-center justify-center rounded-full bg-slate-800/90 text-white border border-slate-700 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
+            aria-label={isPlaying ? "Jeda pemutaran (Space)" : "Mulai pemutaran (Space)"}
+            title={isPlaying ? "Jeda (Space)" : "Putar (Space)"}
+            className="flex size-10 sm:size-11 items-center justify-center rounded-full bg-slate-800/90 text-white border border-slate-700 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
           >
             {isPlaying ? (
               <Pause className="size-5 text-emerald-400" />
@@ -127,10 +152,43 @@ export function PlayerBar({
             size="icon"
             onClick={onNext}
             aria-label="Lagu berikutnya"
-            className="size-9 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
+            className="size-8 sm:size-9 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
           >
-            <SkipForward className="size-4.5" />
+            <SkipForward className="size-4 sm:size-4.5" />
           </Button>
+
+          {/* Repeat Button (3-state cycle: off -> all -> one) */}
+          <button
+            onClick={cycleRepeatMode}
+            aria-label={
+              repeatMode === "one"
+                ? "Ulangi: Lagu ini (R)"
+                : repeatMode === "all"
+                  ? "Ulangi: Semua (R)"
+                  : "Ulangi: Nonaktif (R)"
+            }
+            title={
+              repeatMode === "one"
+                ? "Ulangi: Lagu ini (R)"
+                : repeatMode === "all"
+                  ? "Ulangi: Semua (R)"
+                  : "Ulangi: Nonaktif (R)"
+            }
+            className={`relative flex size-8 sm:size-9 items-center justify-center rounded-full transition-all cursor-pointer ${
+              repeatMode !== "off"
+                ? "text-emerald-400 hover:text-emerald-300"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            {repeatMode === "one" ? (
+              <Repeat1 className="size-4 sm:size-4.5" />
+            ) : (
+              <Repeat className="size-4" />
+            )}
+            {repeatMode !== "off" && (
+              <span className="absolute bottom-1 size-1 rounded-full bg-emerald-400" />
+            )}
+          </button>
         </div>
 
         {/* Right: Time, Volume, Fullscreen, Queue */}

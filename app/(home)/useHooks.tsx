@@ -60,6 +60,13 @@ export function useHome() {
         if (data.featuredVideos && data.featuredVideos.length > 0) {
           setFeaturedVideos(data.featuredVideos);
         }
+        const incomingTracks: Track[] = [
+          ...(data.recentTracks || []),
+          ...(data.topSongs || []),
+        ];
+        if (incomingTracks.length > 0) {
+          useMusicStore.getState().registerTracks(incomingTracks);
+        }
       }
     } catch (err) {
       console.warn("Error fetching dynamic feed:", err);
@@ -80,6 +87,14 @@ export function useHome() {
           if (data.topSongs?.length) setTopSongs(data.topSongs);
           if (data.featuredVideos?.length)
             setFeaturedVideos(data.featuredVideos);
+
+          const incomingTracks: Track[] = [
+            ...(data.recentTracks || []),
+            ...(data.topSongs || []),
+          ];
+          if (incomingTracks.length > 0) {
+            useMusicStore.getState().registerTracks(incomingTracks);
+          }
         }
       } catch (err) {
         console.warn("Initial feed fetch error:", err);

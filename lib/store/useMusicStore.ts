@@ -15,6 +15,11 @@ interface MusicStoreState {
   currentTrack: Track | null;
   lastProgressSec: number;
   volume: number;
+  isShuffle: boolean;
+  repeatMode: "off" | "all" | "one";
+
+  currentTracklist: Track[];
+  allKnownTracks: Track[];
 
   // Ephemeral UI States
   isQueueOpen: boolean;
@@ -24,6 +29,11 @@ interface MusicStoreState {
   setCurrentTrack: (track: Track | null) => void;
   setLastProgressSec: (sec: number) => void;
   setVolume: (volume: number) => void;
+  toggleShuffle: () => void;
+  cycleRepeatMode: () => void;
+  setCurrentTracklist: (tracks: Track[]) => void;
+  registerTracks: (tracks: Track[]) => void;
+  getRandomTrack: (excludeId?: string) => Track;
 
   // Queue Actions
   addToQueue: (track: Track) => void;
@@ -32,6 +42,7 @@ interface MusicStoreState {
   clearQueue: () => void;
   setQueue: (tracks: Track[]) => void;
   popNextQueue: () => Track | null;
+  popRandomQueue: () => Track | null;
   setIsQueueOpen: (isOpen: boolean) => void;
   toggleQueueOpen: () => void;
 
@@ -55,6 +66,8 @@ interface MusicStoreState {
   isFavorite: (trackId: string) => boolean;
 }
 
+const INITIAL_ALL_TRACKS = [...INITIAL_RECENT_TRACKS, ...INITIAL_TOP_SONGS];
+
 const DEFAULT_PLAYLIST_THUMBNAILS = [
   "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80",
@@ -72,6 +85,10 @@ export const useMusicStore = create<MusicStoreState>()(
       currentTrack: INITIAL_RECENT_TRACKS[3],
       lastProgressSec: 0,
       volume: 80,
+      isShuffle: false,
+      repeatMode: "off",
+      currentTracklist: INITIAL_ALL_TRACKS,
+      allKnownTracks: INITIAL_ALL_TRACKS,
       isQueueOpen: false,
       selectedPlaylistId: null,
 
@@ -87,6 +104,69 @@ export const useMusicStore = create<MusicStoreState>()(
       setVolume: (volume: number) => {
         const vol = Math.max(0, Math.min(100, Math.round(volume)));
         set({ volume: vol });
+      },
+
+      toggleShuffle: () => {
+        set((state) => ({ isShuffle: !state.isShuffle }));
+      },
+
+      cycleRepeatMode: () => {
+        set((state) => {
+          const nextMode: "off" | "all" | "one" =
+            state.repeatMode === "off"
+              ? "all"
+              : state.repeatMode === "all"
+                ? "one"
+                : "off";
+          return { repeatMode: nextMode };
+        });
+      },
+
+      setCurrentTracklist: (tracks: Track[]) => {
+        if (!tracks || tracks.length === 0) return;
+        get().registerTracks(tracks);
+        set({ currentTracklist: tracks });
+      },
+
+      registerTracks: (tracks: Track[]) => {
+        if (!tracks || tracks.length === 0) return;
+        set((state) => {
+          const existingIds = new Set(state.allKnownTracks.map((t) => t.id));
+          const existingYt = new Set(
+            state.allKnownTracks.map((t) => t.youtubeId).filter(Boolean),
+          );
+          const newTracks: Track[] = [];
+          for (const track of tracks) {
+            if (
+              !existingIds.has(track.id) &&
+              (!track.youtubeId || !existingYt.has(track.youtubeId))
+            ) {
+              newTracks.push(track);
+              existingIds.add(track.id);
+              if (track.youtubeId) existingYt.add(track.youtubeId);
+            }
+          }
+          if (newTracks.length === 0) return state;
+          return {
+            allKnownTracks: [...state.allKnownTracks, ...newTracks],
+          };
+        });
+      },
+
+      getRandomTrack: (excludeId?: string) => {
+        const { currentTracklist, allKnownTracks } = get();
+        const pool =
+          allKnownTracks.length > 0
+            ? allKnownTracks
+            : currentTracklist.length > 0
+              ? currentTracklist
+              : INITIAL_ALL_TRACKS;
+        const candidates = excludeId
+          ? pool.filter((t) => t.id !== excludeId && t.youtubeId !== excludeId)
+          : pool;
+        const finalPool = candidates.length > 0 ? candidates : pool;
+        const randomIndex = Math.floor(Math.random() * finalPool.length);
+        return finalPool[randomIndex];
       },
 
       // Queue Actions
@@ -122,6 +202,16 @@ export const useMusicStore = create<MusicStoreState>()(
         const [nextTrack, ...rest] = queue;
         set({ queue: rest });
         return nextTrack;
+      },
+
+      popRandomQueue: () => {
+        const { queue } = get();
+        if (queue.length === 0) return null;
+        const randomIndex = Math.floor(Math.random() * queue.length);
+        const chosenTrack = queue[randomIndex];
+        const newQueue = queue.filter((_, idx) => idx !== randomIndex);
+        set({ queue: newQueue });
+        return chosenTrack;
       },
 
       setIsQueueOpen: (isOpen: boolean) => {
@@ -278,6 +368,10 @@ export const useMusicStore = create<MusicStoreState>()(
         currentTrack: state.currentTrack,
         lastProgressSec: state.lastProgressSec,
         volume: state.volume,
+        isShuffle: state.isShuffle,
+        repeatMode: state.repeatMode,
+        currentTracklist: state.currentTracklist,
+        allKnownTracks: state.allKnownTracks,
       }),
     },
   ),

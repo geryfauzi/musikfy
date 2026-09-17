@@ -92,7 +92,9 @@ function SearchContent() {
               currentTrackId={currentTrack?.id}
               isPlaying={isPlaying}
               onBack={() => setActiveTab("search")}
-              onSelectTrack={handleSelectTrack}
+              onSelectTrack={(track) =>
+                handleSelectTrack(track, selectedPlaylist.tracks)
+              }
               onEditPlaylist={(pl) => setEditingPlaylist(pl)}
               onDeletePlaylist={(pl) => setDeletingPlaylist(pl)}
               onOpenAddToPlaylist={(track) => setAddToPlaylistTrack(track)}
@@ -110,7 +112,7 @@ function SearchContent() {
                 currentTrackId={currentTrack?.id}
                 isPlaying={isPlaying}
                 favorites={favorites}
-                onSelectTrack={handleSelectTrack}
+                onSelectTrack={(track) => handleSelectTrack(track, results)}
                 onToggleFavorite={handleToggleFavorite}
                 onAddToQueue={handleAddToQueue}
                 onOpenAddToPlaylist={(track) => setAddToPlaylistTrack(track)}
