@@ -1,17 +1,29 @@
+import {
+  INITIAL_PLAYLISTS,
+  INITIAL_RECENT_TRACKS,
+  INITIAL_TOP_SONGS,
+} from "@/lib/data/initial-music";
+import { Playlist, Track } from "@/lib/types/music";
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { Track, Playlist } from "@/lib/types/music";
-import { INITIAL_PLAYLISTS, INITIAL_TOP_SONGS } from "@/lib/data/initial-music";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 interface MusicStoreState {
   // Persisted States
   queue: Track[];
   playlists: Playlist[];
   favorites: string[];
+  currentTrack: Track | null;
+  lastProgressSec: number;
+  volume: number;
 
   // Ephemeral UI States
   isQueueOpen: boolean;
   selectedPlaylistId: string | null;
+
+  // Playback Actions
+  setCurrentTrack: (track: Track | null) => void;
+  setLastProgressSec: (sec: number) => void;
+  setVolume: (volume: number) => void;
 
   // Queue Actions
   addToQueue: (track: Track) => void;
@@ -24,8 +36,15 @@ interface MusicStoreState {
   toggleQueueOpen: () => void;
 
   // Playlist Actions
-  createPlaylist: (name: string, description?: string, thumbnail?: string) => Playlist;
-  updatePlaylist: (id: string, updates: { name?: string; description?: string; thumbnail?: string }) => void;
+  createPlaylist: (
+    name: string,
+    description?: string,
+    thumbnail?: string,
+  ) => Playlist;
+  updatePlaylist: (
+    id: string,
+    updates: { name?: string; description?: string; thumbnail?: string },
+  ) => void;
   deletePlaylist: (id: string) => void;
   addTrackToPlaylist: (playlistId: string, track: Track) => boolean;
   removeTrackFromPlaylist: (playlistId: string, trackId: string) => void;
@@ -50,8 +69,25 @@ export const useMusicStore = create<MusicStoreState>()(
       queue: [INITIAL_TOP_SONGS[0], INITIAL_TOP_SONGS[1]],
       playlists: INITIAL_PLAYLISTS,
       favorites: ["top-4"],
+      currentTrack: INITIAL_RECENT_TRACKS[3],
+      lastProgressSec: 0,
+      volume: 80,
       isQueueOpen: false,
       selectedPlaylistId: null,
+
+      // Playback Actions
+      setCurrentTrack: (track: Track | null) => {
+        set({ currentTrack: track });
+      },
+
+      setLastProgressSec: (sec: number) => {
+        set({ lastProgressSec: Math.max(0, Math.floor(sec)) });
+      },
+
+      setVolume: (volume: number) => {
+        const vol = Math.max(0, Math.min(100, Math.round(volume)));
+        set({ volume: vol });
+      },
 
       // Queue Actions
       addToQueue: (track: Track) => {
@@ -97,7 +133,11 @@ export const useMusicStore = create<MusicStoreState>()(
       },
 
       // Playlist Actions
-      createPlaylist: (name: string, description?: string, thumbnail?: string) => {
+      createPlaylist: (
+        name: string,
+        description?: string,
+        thumbnail?: string,
+      ) => {
         const randomThumb =
           thumbnail ||
           DEFAULT_PLAYLIST_THUMBNAILS[
@@ -122,18 +162,27 @@ export const useMusicStore = create<MusicStoreState>()(
         return newPlaylist;
       },
 
-      updatePlaylist: (id: string, updates: { name?: string; description?: string; thumbnail?: string }) => {
+      updatePlaylist: (
+        id: string,
+        updates: { name?: string; description?: string; thumbnail?: string },
+      ) => {
         set((state) => ({
           playlists: state.playlists.map((pl) =>
             pl.id === id
               ? {
                   ...pl,
-                  ...(updates.name !== undefined ? { name: updates.name.trim() } : {}),
-                  ...(updates.description !== undefined ? { description: updates.description.trim() } : {}),
-                  ...(updates.thumbnail !== undefined ? { thumbnail: updates.thumbnail } : {}),
+                  ...(updates.name !== undefined
+                    ? { name: updates.name.trim() }
+                    : {}),
+                  ...(updates.description !== undefined
+                    ? { description: updates.description.trim() }
+                    : {}),
+                  ...(updates.thumbnail !== undefined
+                    ? { thumbnail: updates.thumbnail }
+                    : {}),
                   updatedAt: new Date().toISOString(),
                 }
-              : pl
+              : pl,
           ),
         }));
       },
@@ -141,7 +190,8 @@ export const useMusicStore = create<MusicStoreState>()(
       deletePlaylist: (id: string) => {
         set((state) => ({
           playlists: state.playlists.filter((pl) => pl.id !== id),
-          selectedPlaylistId: state.selectedPlaylistId === id ? null : state.selectedPlaylistId,
+          selectedPlaylistId:
+            state.selectedPlaylistId === id ? null : state.selectedPlaylistId,
         }));
       },
 
@@ -152,7 +202,11 @@ export const useMusicStore = create<MusicStoreState>()(
 
         const currentTracks = targetPlaylist.tracks || [];
         // Prevent duplicate tracks in the same playlist
-        const exists = currentTracks.some((t) => t.id === track.id || (track.youtubeId && t.youtubeId === track.youtubeId));
+        const exists = currentTracks.some(
+          (t) =>
+            t.id === track.id ||
+            (track.youtubeId && t.youtubeId === track.youtubeId),
+        );
         if (exists) return false;
 
         const updatedTracks = [...currentTracks, track];
@@ -164,10 +218,13 @@ export const useMusicStore = create<MusicStoreState>()(
                   ...pl,
                   tracks: updatedTracks,
                   songCount: updatedTracks.length,
-                  thumbnail: pl.songCount === 0 && track.thumbnail ? track.thumbnail : pl.thumbnail,
+                  thumbnail:
+                    pl.songCount === 0 && track.thumbnail
+                      ? track.thumbnail
+                      : pl.thumbnail,
                   updatedAt: new Date().toISOString(),
                 }
-              : pl
+              : pl,
           ),
         }));
 
@@ -178,7 +235,9 @@ export const useMusicStore = create<MusicStoreState>()(
         set((state) => ({
           playlists: state.playlists.map((pl) => {
             if (pl.id !== playlistId) return pl;
-            const updatedTracks = (pl.tracks || []).filter((t) => t.id !== trackId);
+            const updatedTracks = (pl.tracks || []).filter(
+              (t) => t.id !== trackId,
+            );
             return {
               ...pl,
               tracks: updatedTracks,
@@ -216,7 +275,10 @@ export const useMusicStore = create<MusicStoreState>()(
         queue: state.queue,
         playlists: state.playlists,
         favorites: state.favorites,
+        currentTrack: state.currentTrack,
+        lastProgressSec: state.lastProgressSec,
+        volume: state.volume,
       }),
-    }
-  )
+    },
+  ),
 );
