@@ -15,6 +15,7 @@ import { del, get, set } from "idb-keyval";
 import { Loader2, LogOut, Menu, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useMusicStore } from "@/lib/store/useMusicStore";
 
 interface SearchHeaderProps {
   searchQuery: string;
@@ -58,6 +59,8 @@ export function SearchHeader({
 
       await set("users", data?.user);
       setUsers(data?.user);
+      await useMusicStore.getState().loadLibraryFromApi();
+      router.refresh();
     },
 
     onError: (error) => {
@@ -66,9 +69,16 @@ export function SearchHeader({
   });
 
   const logout = async () => {
+    try {
+      await fetch("/api/users/logout", { method: "POST" });
+    } catch {
+      // Ignored
+    }
     googleLogout();
     setUsers(null);
     await del("users");
+    useMusicStore.getState().setPlaylists([]);
+    useMusicStore.getState().setFavorites([]);
     router.refresh();
   };
 
@@ -76,6 +86,9 @@ export function SearchHeader({
     const getUser = async () => {
       const data = await get("users");
       setUsers(data);
+      if (data) {
+        useMusicStore.getState().loadLibraryFromApi();
+      }
     };
 
     getUser().finally();

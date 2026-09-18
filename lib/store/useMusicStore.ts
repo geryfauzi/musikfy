@@ -1,5 +1,4 @@
 import {
-  INITIAL_PLAYLISTS,
   INITIAL_RECENT_TRACKS,
   INITIAL_TOP_SONGS,
 } from "@/lib/data/initial-music";
@@ -64,6 +63,15 @@ interface MusicStoreState {
   // Favorite Actions
   toggleFavorite: (trackId: string) => void;
   isFavorite: (trackId: string) => boolean;
+
+  // Library Sync Actions (MongoDB + LocalStorage)
+  setPlaylists: (playlists: Playlist[]) => void;
+  setFavorites: (favorites: string[]) => void;
+  syncLibraryToApi: (override?: {
+    playlists?: Playlist[];
+    favorites?: string[];
+  }) => Promise<void>;
+  loadLibraryFromApi: () => Promise<boolean>;
 }
 
 const INITIAL_ALL_TRACKS = [...INITIAL_RECENT_TRACKS, ...INITIAL_TOP_SONGS];
@@ -75,13 +83,35 @@ const DEFAULT_PLAYLIST_THUMBNAILS = [
   "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=300&auto=format&fit=crop&q=80",
 ];
 
+let syncTimer: NodeJS.Timeout | null = null;
+
+const debouncedSync = (data: {
+  playlists?: Playlist[];
+  favorites?: string[];
+}) => {
+  if (typeof window === "undefined") return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      await fetch("/api/user/library", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+    } catch {
+      // Ignored for offline / unauthenticated users
+    }
+  }, 400);
+};
+
 export const useMusicStore = create<MusicStoreState>()(
   persist(
     (set, get) => ({
       // Default Initial States
       queue: [INITIAL_TOP_SONGS[0], INITIAL_TOP_SONGS[1]],
-      playlists: INITIAL_PLAYLISTS,
-      favorites: ["top-4"],
+      playlists: [],
+      favorites: [],
       currentTrack: INITIAL_RECENT_TRACKS[3],
       lastProgressSec: 0,
       volume: 80,
@@ -245,9 +275,9 @@ export const useMusicStore = create<MusicStoreState>()(
           updatedAt: new Date().toISOString(),
         };
 
-        set((state) => ({
-          playlists: [newPlaylist, ...state.playlists],
-        }));
+        const updatedPlaylists = [newPlaylist, ...get().playlists];
+        set({ playlists: updatedPlaylists });
+        debouncedSync({ playlists: updatedPlaylists });
 
         return newPlaylist;
       },
@@ -256,33 +286,36 @@ export const useMusicStore = create<MusicStoreState>()(
         id: string,
         updates: { name?: string; description?: string; thumbnail?: string },
       ) => {
-        set((state) => ({
-          playlists: state.playlists.map((pl) =>
-            pl.id === id
-              ? {
-                  ...pl,
-                  ...(updates.name !== undefined
-                    ? { name: updates.name.trim() }
-                    : {}),
-                  ...(updates.description !== undefined
-                    ? { description: updates.description.trim() }
-                    : {}),
-                  ...(updates.thumbnail !== undefined
-                    ? { thumbnail: updates.thumbnail }
-                    : {}),
-                  updatedAt: new Date().toISOString(),
-                }
-              : pl,
-          ),
-        }));
+        const updatedPlaylists = get().playlists.map((pl) =>
+          pl.id === id
+            ? {
+                ...pl,
+                ...(updates.name !== undefined
+                  ? { name: updates.name.trim() }
+                  : {}),
+                ...(updates.description !== undefined
+                  ? { description: updates.description.trim() }
+                  : {}),
+                ...(updates.thumbnail !== undefined
+                  ? { thumbnail: updates.thumbnail }
+                  : {}),
+                updatedAt: new Date().toISOString(),
+              }
+            : pl,
+        );
+
+        set({ playlists: updatedPlaylists });
+        debouncedSync({ playlists: updatedPlaylists });
       },
 
       deletePlaylist: (id: string) => {
+        const updatedPlaylists = get().playlists.filter((pl) => pl.id !== id);
         set((state) => ({
-          playlists: state.playlists.filter((pl) => pl.id !== id),
+          playlists: updatedPlaylists,
           selectedPlaylistId:
             state.selectedPlaylistId === id ? null : state.selectedPlaylistId,
         }));
+        debouncedSync({ playlists: updatedPlaylists });
       },
 
       addTrackToPlaylist: (playlistId: string, track: Track) => {
@@ -291,7 +324,6 @@ export const useMusicStore = create<MusicStoreState>()(
         if (!targetPlaylist) return false;
 
         const currentTracks = targetPlaylist.tracks || [];
-        // Prevent duplicate tracks in the same playlist
         const exists = currentTracks.some(
           (t) =>
             t.id === track.id ||
@@ -300,42 +332,43 @@ export const useMusicStore = create<MusicStoreState>()(
         if (exists) return false;
 
         const updatedTracks = [...currentTracks, track];
+        const updatedPlaylists = playlists.map((pl) =>
+          pl.id === playlistId
+            ? {
+                ...pl,
+                tracks: updatedTracks,
+                songCount: updatedTracks.length,
+                thumbnail:
+                  pl.songCount === 0 && track.thumbnail
+                    ? track.thumbnail
+                    : pl.thumbnail,
+                updatedAt: new Date().toISOString(),
+              }
+            : pl,
+        );
 
-        set((state) => ({
-          playlists: state.playlists.map((pl) =>
-            pl.id === playlistId
-              ? {
-                  ...pl,
-                  tracks: updatedTracks,
-                  songCount: updatedTracks.length,
-                  thumbnail:
-                    pl.songCount === 0 && track.thumbnail
-                      ? track.thumbnail
-                      : pl.thumbnail,
-                  updatedAt: new Date().toISOString(),
-                }
-              : pl,
-          ),
-        }));
+        set({ playlists: updatedPlaylists });
+        debouncedSync({ playlists: updatedPlaylists });
 
         return true;
       },
 
       removeTrackFromPlaylist: (playlistId: string, trackId: string) => {
-        set((state) => ({
-          playlists: state.playlists.map((pl) => {
-            if (pl.id !== playlistId) return pl;
-            const updatedTracks = (pl.tracks || []).filter(
-              (t) => t.id !== trackId,
-            );
-            return {
-              ...pl,
-              tracks: updatedTracks,
-              songCount: updatedTracks.length,
-              updatedAt: new Date().toISOString(),
-            };
-          }),
-        }));
+        const updatedPlaylists = get().playlists.map((pl) => {
+          if (pl.id !== playlistId) return pl;
+          const updatedTracks = (pl.tracks || []).filter(
+            (t) => t.id !== trackId,
+          );
+          return {
+            ...pl,
+            tracks: updatedTracks,
+            songCount: updatedTracks.length,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+
+        set({ playlists: updatedPlaylists });
+        debouncedSync({ playlists: updatedPlaylists });
       },
 
       setSelectedPlaylistId: (id: string | null) => {
@@ -344,22 +377,74 @@ export const useMusicStore = create<MusicStoreState>()(
 
       // Favorite Actions
       toggleFavorite: (trackId: string) => {
-        set((state) => {
-          const isFav = state.favorites.includes(trackId);
-          return {
-            favorites: isFav
-              ? state.favorites.filter((id) => id !== trackId)
-              : [...state.favorites, trackId],
-          };
-        });
+        const currentFavorites = get().favorites;
+        const isFav = currentFavorites.includes(trackId);
+        const nextFavorites = isFav
+          ? currentFavorites.filter((id) => id !== trackId)
+          : [...currentFavorites, trackId];
+
+        set({ favorites: nextFavorites });
+        debouncedSync({ favorites: nextFavorites });
       },
 
       isFavorite: (trackId: string) => {
         return get().favorites.includes(trackId);
       },
+
+      // Library Sync Actions (MongoDB + LocalStorage)
+      setPlaylists: (playlists: Playlist[]) => {
+        set({ playlists });
+      },
+
+      setFavorites: (favorites: string[]) => {
+        set({ favorites });
+      },
+
+      syncLibraryToApi: async (override) => {
+        const { playlists, favorites } = get();
+        debouncedSync({
+          playlists: override?.playlists ?? playlists,
+          favorites: override?.favorites ?? favorites,
+        });
+      },
+
+      loadLibraryFromApi: async () => {
+        if (typeof window === "undefined") return false;
+        try {
+          const res = await fetch("/api/user/library", {
+            credentials: "include",
+          });
+
+          if (!res.ok) return false;
+
+          const data = await res.json();
+
+          // If MongoDB has saved library data, apply it to state
+          if (data.playlists !== null || data.favorites !== null) {
+            set({
+              playlists: Array.isArray(data.playlists) ? data.playlists : [],
+              favorites: Array.isArray(data.favorites) ? data.favorites : [],
+            });
+            return true;
+          }
+
+          // First-time login: initialize as empty library
+          set({ playlists: [], favorites: [] });
+          await fetch("/api/user/library", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ playlists: [], favorites: [] }),
+          });
+
+          return true;
+        } catch {
+          return false;
+        }
+      },
     }),
     {
-      name: "musikfy_music_store_v1",
+      name: "musikfy_music_store_v2",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         queue: state.queue,

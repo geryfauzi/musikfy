@@ -169,6 +169,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           initialTrackIdRef.current = state.currentTrack.youtubeId;
         }
       }
+      useMusicStore.getState().loadLibraryFromApi();
     };
 
     if (useMusicStore.persist?.hasHydrated?.()) {
