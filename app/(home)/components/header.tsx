@@ -1,8 +1,20 @@
 "use client";
 
-import { Search, Bell, Menu } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { googleLogout, useGoogleLogin } from "@react-oauth/google";
+import { del, get, set } from "idb-keyval";
+import { LogOut, Menu, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface HeaderProps {
   searchQuery: string;
@@ -23,6 +35,54 @@ export function Header({
   onOpenMobileMenu,
   onSearchSubmit,
 }: HeaderProps) {
+  const router = useRouter();
+  const [users, setUsers] = useState<any>(null);
+
+  const login = useGoogleLogin({
+    onSuccess: async ({ access_token }) => {
+      const res = await fetch("/api/users/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          accessToken: access_token,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error(data.message);
+        return;
+      }
+
+      await set("users", data?.user);
+      setUsers(data?.user);
+    },
+
+    onError: (error) => {
+      console.error(error);
+    },
+  });
+
+  const logout = async () => {
+    googleLogout();
+    setUsers(null);
+    await del("users");
+    router.refresh();
+  };
+
+  useEffect(() => {
+    const getUser = async () => {
+      const data = await get("users");
+      setUsers(data);
+    };
+
+    getUser().finally();
+  }, []);
+
   return (
     <header className="sticky top-0 z-30 bg-[#080c14]/90 backdrop-blur-md pt-4 pb-3 border-b border-slate-900/60">
       {/* Top Search & Profile Row */}
@@ -57,24 +117,37 @@ export function Header({
         </form>
 
         {/* Action icons & User Profile */}
-        <div className="flex items-center gap-3 shrink-0">
+        {!users && (
           <Button
-            variant="ghost"
-            size="icon"
-            className="size-10 rounded-full text-slate-300 hover:bg-slate-800 hover:text-white"
-            aria-label="Notifikasi"
+            className={
+              "cursor-pointer bg-gradient-to-br from-emerald-500 to-teal-400 text-slate-950"
+            }
+            variant={"ghost"}
+            onClick={() => login()}
           >
-            <Bell className="size-4.5" />
+            Sign in
           </Button>
-
-          <div className="flex items-center gap-2 pl-1">
-            <img
-              src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80"
-              alt="Profil Pengguna"
-              className="size-9 rounded-full object-cover ring-2 ring-emerald-500/30"
-            />
-          </div>
-        </div>
+        )}
+        {users?.id && (
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Avatar className={"cursor-pointer"}>
+                <AvatarImage src={users?.picture} />
+                <AvatarFallback>CN</AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel
+                  className={"cursor-pointer flex flex-row gap-2"}
+                  onClick={logout}
+                >
+                  <LogOut size={15} /> <span className="my-auto">Sign Out</span>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Genre Chips Row */}

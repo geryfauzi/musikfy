@@ -1,8 +1,20 @@
 "use client";
 
-import { Search, X, Loader2, Menu } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { googleLogout, useGoogleLogin } from "@react-oauth/google";
+import { del, get, set } from "idb-keyval";
+import { Loader2, LogOut, Menu, Search, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface SearchHeaderProps {
   searchQuery: string;
@@ -21,6 +33,53 @@ export function SearchHeader({
   isLoading,
   onOpenMobileMenu,
 }: SearchHeaderProps) {
+  const router = useRouter();
+  const [users, setUsers] = useState<any>(null);
+
+  const login = useGoogleLogin({
+    onSuccess: async ({ access_token }) => {
+      const res = await fetch("/api/users/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          accessToken: access_token,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error(data.message);
+        return;
+      }
+
+      await set("users", data?.user);
+      setUsers(data?.user);
+    },
+
+    onError: (error) => {
+      console.error(error);
+    },
+  });
+
+  const logout = async () => {
+    googleLogout();
+    setUsers(null);
+    await del("users");
+    router.refresh();
+  };
+
+  useEffect(() => {
+    const getUser = async () => {
+      const data = await get("users");
+      setUsers(data);
+    };
+
+    getUser().finally();
+  }, []);
   return (
     <header className="sticky top-0 z-30 bg-[#080c14]/90 backdrop-blur-md pt-4 pb-4 border-b border-slate-900/80">
       <div className="flex items-center gap-3 px-4 sm:px-6 max-w-7xl mx-auto w-full">
@@ -78,6 +137,37 @@ export function SearchHeader({
             </Button>
           </div>
         </form>
+        {!users && (
+          <Button
+            className={
+              "cursor-pointer ml-auto bg-gradient-to-br from-emerald-500 to-teal-400 text-slate-950"
+            }
+            variant={"ghost"}
+            onClick={() => login()}
+          >
+            Sign in
+          </Button>
+        )}
+        {users?.id && (
+          <DropdownMenu>
+            <DropdownMenuTrigger className="ml-auto">
+              <Avatar className={"cursor-pointer"}>
+                <AvatarImage src={users?.picture} />
+                <AvatarFallback>CN</AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel
+                  className={"cursor-pointer flex flex-row gap-2"}
+                  onClick={logout}
+                >
+                  <LogOut size={15} /> <span className="my-auto">Sign Out</span>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </header>
   );

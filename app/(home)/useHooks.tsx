@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { usePlayer } from "@/lib/context/player-context";
-import { Track, VideoItem, Playlist } from "@/lib/types/music";
 import {
   INITIAL_RECENT_TRACKS,
   INITIAL_TOP_SONGS,
   INITIAL_VIDEOS,
 } from "@/lib/data/initial-music";
+import { Playlist, Track, VideoItem } from "@/lib/types/music";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 import { useMusicStore } from "@/lib/store/useMusicStore";
 
@@ -26,8 +26,12 @@ export function useHome() {
   // Modal States
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
-  const [deletingPlaylist, setDeletingPlaylist] = useState<Playlist | null>(null);
-  const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(null);
+  const [deletingPlaylist, setDeletingPlaylist] = useState<Playlist | null>(
+    null,
+  );
+  const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<Track | null>(
+    null,
+  );
 
   // Active Selected Playlist when viewing playlist detail
   const selectedPlaylist = activeTab.startsWith("playlist-")
@@ -156,7 +160,6 @@ export function useHome() {
     durationSec: player.durationSec,
     volume: player.volume,
     favorites: player.favorites,
-
     // Player Actions
     handleTogglePlay: player.handleTogglePlay,
     handleSelectTrack: player.handleSelectTrack,
