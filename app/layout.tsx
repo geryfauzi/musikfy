@@ -1,4 +1,5 @@
 import { PlayerProvider } from "@/lib/context/player-context";
+import { FullscreenLyricsModal } from "@/components/lyrics/fullscreen-lyrics-modal";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -31,7 +32,10 @@ export default function RootLayout({
     >
       <body className="h-full overflow-hidden bg-[#080c14] text-slate-100">
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_CLIENT_ID ?? ""}>
-          <PlayerProvider>{children}</PlayerProvider>
+          <PlayerProvider>
+            {children}
+            <FullscreenLyricsModal />
+          </PlayerProvider>
         </GoogleOAuthProvider>
       </body>
     </html>

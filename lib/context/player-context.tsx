@@ -530,8 +530,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           const current = ytPlayerRef.current.getCurrentTime();
           const dur = ytPlayerRef.current.getDuration();
           if (typeof current === "number" && !isNaN(current) && current >= 0) {
+            setProgressSec(current);
             const currentFloor = Math.floor(current);
-            setProgressSec(currentFloor);
             if (currentFloor % 3 === 0) {
               setStoreLastProgressSec(currentFloor);
             }
@@ -543,7 +543,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           // Ignored
         }
       }
-    }, 1000);
+    }, 250);
 
     return () => clearInterval(interval);
   }, [isPlaying, setStoreLastProgressSec]);
@@ -744,6 +744,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           if (currentTrack) {
             e.preventDefault();
             handleToggleFavorite(currentTrack.id);
+          }
+          break;
+        case "KeyK":
+          e.preventDefault();
+          useMusicStore.getState().toggleLyricsOpen();
+          break;
+        case "Escape":
+          if (useMusicStore.getState().isLyricsOpen) {
+            e.preventDefault();
+            useMusicStore.getState().setIsLyricsOpen(false);
           }
           break;
       }

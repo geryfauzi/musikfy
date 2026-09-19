@@ -10,8 +10,8 @@ import {
   Repeat1,
   Volume2,
   VolumeX,
-  Maximize2,
   ListMusic,
+  Mic2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -48,6 +48,8 @@ export function PlayerBar({
   const queue = useMusicStore((state) => state.queue);
   const isQueueOpen = useMusicStore((state) => state.isQueueOpen);
   const toggleQueueOpen = useMusicStore((state) => state.toggleQueueOpen);
+  const isLyricsOpen = useMusicStore((state) => state.isLyricsOpen);
+  const toggleLyricsOpen = useMusicStore((state) => state.toggleLyricsOpen);
   const isShuffle = useMusicStore((state) => state.isShuffle);
   const repeatMode = useMusicStore((state) => state.repeatMode);
   const toggleShuffle = useMusicStore((state) => state.toggleShuffle);
@@ -62,7 +64,8 @@ export function PlayerBar({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const progressPercent = durationSec > 0 ? Math.min(100, (progressSec / durationSec) * 100) : 0;
+  const progressPercent =
+    durationSec > 0 ? Math.min(100, (progressSec / durationSec) * 100) : 0;
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-800 bg-[#090d16]/98 backdrop-blur-xl">
@@ -136,7 +139,9 @@ export function PlayerBar({
 
           <button
             onClick={onTogglePlay}
-            aria-label={isPlaying ? "Jeda pemutaran (Space)" : "Mulai pemutaran (Space)"}
+            aria-label={
+              isPlaying ? "Jeda pemutaran (Space)" : "Mulai pemutaran (Space)"
+            }
             title={isPlaying ? "Jeda (Space)" : "Putar (Space)"}
             className="flex size-10 sm:size-11 items-center justify-center rounded-full bg-slate-800/90 text-white border border-slate-700 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
           >
@@ -228,35 +233,44 @@ export function PlayerBar({
             </span>
           </div>
 
-          {/* Fullscreen Button */}
+          {/* Lyrics Button */}
           <Button
             variant="ghost"
             size="icon"
-            className="hidden lg:flex size-8 text-slate-400 hover:text-white cursor-pointer"
-            aria-label="Layar penuh"
-          >
-            <Maximize2 className="size-4" />
-          </Button>
-
-          {/* Queue Button with counter badge */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleQueue || toggleQueueOpen}
+            onClick={toggleLyricsOpen}
+            aria-label={
+              isLyricsOpen ? "Tutup lirik lagu (K)" : "Buka lirik lagu (K)"
+            }
+            title={isLyricsOpen ? "Tutup lirik (K)" : "Lirik lagu (K)"}
             className={`relative size-9 rounded-xl transition-colors cursor-pointer ${
-              isQueueOpen
+              isLyricsOpen
                 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                 : "text-slate-400 hover:text-white hover:bg-slate-800"
             }`}
-            aria-label="Buka antrean lagu"
           >
-            <ListMusic className="size-4.5" />
-            {queue.length > 0 && (
-              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold font-mono text-slate-950 shadow-sm">
-                {queue.length > 9 ? "9+" : queue.length}
-              </span>
-            )}
+            <Mic2 className="size-4.5" />
           </Button>
+
+          {!isLyricsOpen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleQueue || toggleQueueOpen}
+              className={`relative size-9 rounded-xl transition-colors cursor-pointer ${
+                isQueueOpen
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800"
+              }`}
+              aria-label="Buka antrean lagu"
+            >
+              <ListMusic className="size-4.5" />
+              {queue.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold font-mono text-slate-950 shadow-sm">
+                  {queue.length > 9 ? "9+" : queue.length}
+                </span>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </footer>

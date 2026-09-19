@@ -38,3 +38,17 @@ export interface HomeFeedData {
   topSongs: Track[];
   featuredVideos: VideoItem[];
 }
+
+export interface LyricLine {
+  time: number; // in seconds
+  text: string;
+}
+
+export interface LyricsData {
+  syncedLyrics: LyricLine[] | null;
+  plainLyrics: string | null;
+  hasSynced: boolean;
+  trackName?: string;
+  artistName?: string;
+  duration?: number;
+}

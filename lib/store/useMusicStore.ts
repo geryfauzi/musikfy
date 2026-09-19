@@ -22,6 +22,7 @@ interface MusicStoreState {
 
   // Ephemeral UI States
   isQueueOpen: boolean;
+  isLyricsOpen: boolean;
   selectedPlaylistId: string | null;
 
   // Playback Actions
@@ -44,6 +45,10 @@ interface MusicStoreState {
   popRandomQueue: () => Track | null;
   setIsQueueOpen: (isOpen: boolean) => void;
   toggleQueueOpen: () => void;
+
+  // Lyrics Actions
+  setIsLyricsOpen: (isOpen: boolean) => void;
+  toggleLyricsOpen: () => void;
 
   // Playlist Actions
   createPlaylist: (
@@ -120,6 +125,7 @@ export const useMusicStore = create<MusicStoreState>()(
       currentTracklist: INITIAL_ALL_TRACKS,
       allKnownTracks: INITIAL_ALL_TRACKS,
       isQueueOpen: false,
+      isLyricsOpen: false,
       selectedPlaylistId: null,
 
       // Playback Actions
@@ -250,6 +256,15 @@ export const useMusicStore = create<MusicStoreState>()(
 
       toggleQueueOpen: () => {
         set((state) => ({ isQueueOpen: !state.isQueueOpen }));
+      },
+
+      // Lyrics Actions
+      setIsLyricsOpen: (isOpen: boolean) => {
+        set({ isLyricsOpen: isOpen });
+      },
+
+      toggleLyricsOpen: () => {
+        set((state) => ({ isLyricsOpen: !state.isLyricsOpen }));
       },
 
       // Playlist Actions
