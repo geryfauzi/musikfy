@@ -77,6 +77,7 @@ interface MusicStoreState {
     favorites?: string[];
   }) => Promise<void>;
   loadLibraryFromApi: () => Promise<boolean>;
+  clearstate: (key: string) => void;
 }
 
 const INITIAL_ALL_TRACKS = [...INITIAL_RECENT_TRACKS, ...INITIAL_TOP_SONGS];
@@ -108,6 +109,22 @@ const debouncedSync = (data: {
       // Ignored for offline / unauthenticated users
     }
   }, 400);
+};
+
+const initialValue: any = {
+  queue: [],
+  playlists: [],
+  favorites: [],
+  currentTrack: INITIAL_RECENT_TRACKS[3],
+  lastProgressSec: 0,
+  volume: 80,
+  isShuffle: false,
+  repeatMode: "off",
+  currentTracklist: INITIAL_ALL_TRACKS,
+  allKnownTracks: INITIAL_ALL_TRACKS,
+  isQueueOpen: false,
+  isLyricsOpen: false,
+  selectedPlaylistId: null,
 };
 
 export const useMusicStore = create<MusicStoreState>()(
@@ -209,6 +226,12 @@ export const useMusicStore = create<MusicStoreState>()(
       addToQueue: (track: Track) => {
         set((state) => ({
           queue: [...state.queue, track],
+        }));
+      },
+
+      clearstate: (key: string) => {
+        set(() => ({
+          [key]: initialValue[key],
         }));
       },
 

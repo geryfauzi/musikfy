@@ -35,10 +35,12 @@ export function PlaylistDetailView({
   onDeletePlaylist,
   onOpenAddToPlaylist,
 }: PlaylistDetailViewProps) {
-  const { removeTrackFromPlaylist, addMultipleToQueue } = useMusicStore();
+  const { removeTrackFromPlaylist, addMultipleToQueue, clearstate } =
+    useMusicStore();
   const tracks = playlist.tracks || [];
 
   const handlePlayAll = () => {
+    clearstate("queue");
     if (tracks.length > 0) {
       onSelectTrack(tracks[0]);
       if (tracks.length > 1) {
@@ -61,7 +63,7 @@ export function PlaylistDetailView({
         className="flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
       >
         <ArrowLeft className="size-4" />
-        <span>Kembali ke Beranda</span>
+        <span>Kembali</span>
       </button>
 
       {/* Playlist Hero Banner */}
@@ -147,7 +149,8 @@ export function PlaylistDetailView({
                 Belum ada lagu di playlist ini
               </p>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Cari lagu di halaman Pencarian atau pilih lagu di Beranda, lalu pilih opsi &quot;Tambahkan ke Playlist&quot;.
+                Cari lagu di halaman Pencarian atau pilih lagu di Beranda, lalu
+                pilih opsi &quot;Tambahkan ke Playlist&quot;.
               </p>
             </div>
           </div>
@@ -167,12 +170,18 @@ export function PlaylistDetailView({
                 >
                   {/* Left: Index + Thumbnail + Title/Artist */}
                   <div
-                    onClick={() => onSelectTrack(track)}
+                    onClick={() => {
+                      clearstate("queue");
+                      onSelectTrack(track);
+                      addMultipleToQueue(tracks?.toSpliced(index, 1));
+                    }}
                     className="flex items-center gap-3.5 min-w-0 flex-1 cursor-pointer"
                   >
                     <span
                       className={`w-6 text-center text-xs font-mono font-medium shrink-0 ${
-                        isCurrent ? "text-emerald-400" : "text-slate-500 group-hover:text-slate-300"
+                        isCurrent
+                          ? "text-emerald-400"
+                          : "text-slate-500 group-hover:text-slate-300"
                       }`}
                     >
                       {index + 1}
@@ -198,7 +207,9 @@ export function PlaylistDetailView({
                     <div className="min-w-0 flex-1 pr-2">
                       <p
                         className={`truncate text-sm font-semibold ${
-                          isCurrent ? "text-emerald-400" : "text-slate-100 group-hover:text-emerald-300"
+                          isCurrent
+                            ? "text-emerald-400"
+                            : "text-slate-100 group-hover:text-emerald-300"
                         }`}
                       >
                         {track.title}
@@ -216,7 +227,9 @@ export function PlaylistDetailView({
                     </span>
 
                     <button
-                      onClick={() => removeTrackFromPlaylist(playlist.id, track.id)}
+                      onClick={() =>
+                        removeTrackFromPlaylist(playlist.id, track.id)
+                      }
                       className="size-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
                       aria-label={`Hapus ${track.title} dari playlist`}
                       title="Hapus dari playlist"
@@ -226,7 +239,11 @@ export function PlaylistDetailView({
 
                     <SongActionMenu
                       track={track}
-                      onPlay={onSelectTrack}
+                      onPlay={() => {
+                        clearstate("queue");
+                        onSelectTrack(track);
+                        addMultipleToQueue(tracks?.toSpliced(index, 1));
+                      }}
                       onAddToPlaylist={onOpenAddToPlaylist}
                     />
                   </div>
