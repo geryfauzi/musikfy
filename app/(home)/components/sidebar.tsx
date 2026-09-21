@@ -1,20 +1,19 @@
 "use client";
 
-import {
-  Home,
-  Search,
-  BarChart2,
-  Heart,
-  Library,
-  Plus,
-  Music2,
-  X,
-  Pencil,
-  Trash2,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Playlist } from "@/lib/types/music";
+import {
+  BarChart2,
+  Heart,
+  Home,
+  Music2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface SidebarProps {
   playlists: Playlist[];
@@ -42,9 +41,8 @@ export function Sidebar({
   const navItems = [
     { id: "home", label: "Home", icon: Home, href: "/" },
     { id: "search", label: "Search", icon: Search, href: "/search" },
-    { id: "ranking", label: "Ranking", icon: BarChart2 },
-    { id: "favorite", label: "Favorite", icon: Heart },
-    { id: "library", label: "Library", icon: Library },
+    { id: "ranking", label: "Ranking", icon: BarChart2, href: "/ranking" },
+    { id: "favorite", label: "Favorite", icon: Heart, href: "/favorite" },
   ];
 
   return (
@@ -107,7 +105,9 @@ export function Sidebar({
                     : "text-slate-400 hover:bg-slate-900/80 hover:text-slate-200"
                 }`}
               >
-                <Icon className={`size-4.5 ${isActive ? "text-emerald-400" : "text-slate-400"}`} />
+                <Icon
+                  className={`size-4.5 ${isActive ? "text-emerald-400" : "text-slate-400"}`}
+                />
                 <span>{item.label}</span>
               </button>
             );

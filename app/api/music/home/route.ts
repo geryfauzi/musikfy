@@ -1,7 +1,11 @@
+import {
+  INITIAL_FEED,
+  INITIAL_RECENT_TRACKS,
+  INITIAL_TOP_SONGS,
+} from "@/lib/data/initial-music";
+import { HomeFeedData, Track, VideoItem } from "@/lib/types/music";
 import { NextRequest, NextResponse } from "next/server";
 import { Innertube, UniversalCache } from "youtubei.js";
-import { HomeFeedData, Track, VideoItem } from "@/lib/types/music";
-import { INITIAL_FEED, INITIAL_TOP_SONGS, INITIAL_RECENT_TRACKS } from "@/lib/data/initial-music";
 
 // In-memory cache with 30-minute TTL
 const feedCache = new Map<string, { data: HomeFeedData; timestamp: number }>();
@@ -22,7 +26,8 @@ function getInnertube(): Promise<Innertube> {
 function parseDurationSec(durText?: string): number {
   if (!durText) return 210;
   const parts = durText.split(":").map(Number);
-  if (parts.length === 3) return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+  if (parts.length === 3)
+    return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
   if (parts.length === 2) return (parts[0] || 0) * 60 + (parts[1] || 0);
   return Number(durText) || 210;
 }
@@ -59,13 +64,16 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Parse Recent Tracks
-    const rawRecent = (recentSearch?.songs?.contents || []).filter((s) => Boolean(s.id));
+    const rawRecent = (recentSearch?.songs?.contents || []).filter((s) =>
+      Boolean(s.id),
+    );
     const recentTracks: Track[] =
       rawRecent.length > 0
         ? rawRecent.slice(0, 6).map((s, idx) => ({
             id: s.id || `api-rec-${idx}`,
             title: s.title || "Unknown Title",
-            artist: s.artists?.map((a) => a.name).join(", ") || "Unknown Artist",
+            artist:
+              s.artists?.map((a) => a.name).join(", ") || "Unknown Artist",
             album: s.album?.name || "Single",
             duration: s.duration?.text || "03:30",
             durationSec: parseDurationSec(s.duration?.text),
@@ -79,13 +87,16 @@ export async function GET(request: NextRequest) {
         : INITIAL_RECENT_TRACKS;
 
     // Parse Top Songs
-    const rawTop = (topSearch?.songs?.contents || []).filter((s) => Boolean(s.id));
+    const rawTop = (topSearch?.songs?.contents || []).filter((s) =>
+      Boolean(s.id),
+    );
     const topSongs: Track[] =
       rawTop.length > 0
         ? rawTop.slice(0, 8).map((s, idx) => ({
             id: s.id || `api-top-${idx}`,
             title: s.title || "Unknown Title",
-            artist: s.artists?.map((a) => a.name).join(", ") || "Unknown Artist",
+            artist:
+              s.artists?.map((a) => a.name).join(", ") || "Unknown Artist",
             album: s.album?.name || "Single",
             duration: s.duration?.text || "03:30",
             durationSec: parseDurationSec(s.duration?.text),
@@ -99,7 +110,9 @@ export async function GET(request: NextRequest) {
         : INITIAL_TOP_SONGS;
 
     // Parse Featured Videos
-    const rawVideos = (videoSearch?.videos?.contents || []).filter((v) => Boolean(v.id));
+    const rawVideos = (videoSearch?.videos?.contents || []).filter((v) =>
+      Boolean(v.id),
+    );
     const featuredVideos: VideoItem[] =
       rawVideos.length > 0
         ? rawVideos.slice(0, 3).map((v, idx) => ({

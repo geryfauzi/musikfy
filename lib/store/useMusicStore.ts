@@ -12,6 +12,7 @@ interface MusicStoreState {
   playlists: Playlist[];
   favorites: string[];
   currentTrack: Track | null;
+  history: Track[];
   lastProgressSec: number;
   volume: number;
   isShuffle: boolean;
@@ -66,8 +67,9 @@ interface MusicStoreState {
   setSelectedPlaylistId: (id: string | null) => void;
 
   // Favorite Actions
-  toggleFavorite: (trackId: string) => void;
+  toggleFavorite: (trackOrId: string | Track) => void;
   isFavorite: (trackId: string) => boolean;
+  getFavoriteTracks: () => Track[];
 
   // Library Sync Actions (MongoDB + LocalStorage)
   setPlaylists: (playlists: Playlist[]) => void;
@@ -116,6 +118,7 @@ const initialValue: any = {
   playlists: [],
   favorites: [],
   currentTrack: INITIAL_RECENT_TRACKS[3],
+  history: [],
   lastProgressSec: 0,
   volume: 80,
   isShuffle: false,
@@ -135,6 +138,7 @@ export const useMusicStore = create<MusicStoreState>()(
       playlists: [],
       favorites: [],
       currentTrack: INITIAL_RECENT_TRACKS[3],
+      history: [],
       lastProgressSec: 0,
       volume: 80,
       isShuffle: false,
@@ -147,7 +151,21 @@ export const useMusicStore = create<MusicStoreState>()(
 
       // Playback Actions
       setCurrentTrack: (track: Track | null) => {
-        set({ currentTrack: track });
+        if (!track) {
+          set({ currentTrack: null });
+          return;
+        }
+        set((state) => {
+          const filteredHistory = state.history.filter(
+            (t) =>
+              t.id !== track.id &&
+              (!track.youtubeId || t.youtubeId !== track.youtubeId),
+          );
+          return {
+            currentTrack: track,
+            history: [track, ...filteredHistory].slice(0, 20),
+          };
+        });
       },
 
       setLastProgressSec: (sec: number) => {
@@ -414,12 +432,18 @@ export const useMusicStore = create<MusicStoreState>()(
       },
 
       // Favorite Actions
-      toggleFavorite: (trackId: string) => {
+      toggleFavorite: (trackOrId: string | Track) => {
+        const trackId =
+          typeof trackOrId === "string" ? trackOrId : trackOrId.id;
         const currentFavorites = get().favorites;
         const isFav = currentFavorites.includes(trackId);
         const nextFavorites = isFav
           ? currentFavorites.filter((id) => id !== trackId)
           : [...currentFavorites, trackId];
+
+        if (typeof trackOrId !== "string") {
+          get().registerTracks([trackOrId]);
+        }
 
         set({ favorites: nextFavorites });
         debouncedSync({ favorites: nextFavorites });
@@ -427,6 +451,18 @@ export const useMusicStore = create<MusicStoreState>()(
 
       isFavorite: (trackId: string) => {
         return get().favorites.includes(trackId);
+      },
+
+      getFavoriteTracks: () => {
+        const { favorites, allKnownTracks } = get();
+        const trackMap = new Map<string, Track>();
+        for (const t of allKnownTracks) {
+          trackMap.set(t.id, t);
+          if (t.youtubeId) trackMap.set(t.youtubeId, t);
+        }
+        return favorites
+          .map((id) => trackMap.get(id))
+          .filter(Boolean) as Track[];
       },
 
       // Library Sync Actions (MongoDB + LocalStorage)
@@ -489,6 +525,7 @@ export const useMusicStore = create<MusicStoreState>()(
         playlists: state.playlists,
         favorites: state.favorites,
         currentTrack: state.currentTrack,
+        history: state.history,
         lastProgressSec: state.lastProgressSec,
         volume: state.volume,
         isShuffle: state.isShuffle,

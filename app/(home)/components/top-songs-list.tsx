@@ -6,6 +6,10 @@ import { SongActionMenu } from "@/components/song-action-menu";
 
 interface TopSongsListProps {
   tracks: Track[];
+  title?: string;
+  subtitle?: string;
+  badge?: string;
+  isLoading?: boolean;
   currentTrackId?: string;
   isPlaying?: boolean;
   favorites: string[];
@@ -16,6 +20,10 @@ interface TopSongsListProps {
 
 export function TopSongsList({
   tracks,
+  title = "Rekomendasi Untuk Anda",
+  subtitle,
+  badge,
+  isLoading = false,
   currentTrackId,
   isPlaying,
   favorites,
@@ -25,11 +33,44 @@ export function TopSongsList({
 }: TopSongsListProps) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-xl font-bold tracking-tight text-white">
-          Top 10 songs
-        </h2>
+      <div className="flex flex-col gap-0.5 px-1">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xl font-bold tracking-tight text-white">
+            {title}
+          </h2>
+          {badge && (
+            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              {badge}
+            </span>
+          )}
+        </div>
+        {subtitle && (
+          <p className="text-xs text-slate-400 truncate">
+            {subtitle}
+          </p>
+        )}
       </div>
+
+      {isLoading ? (
+        <div className="space-y-1.5" aria-label="Memuat rekomendasi musik">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div
+              key={`skeleton-rec-${idx}`}
+              className="flex items-center justify-between rounded-xl px-3 py-2.5 bg-slate-900/30 animate-pulse"
+            >
+              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                <div className="w-6 h-4 bg-slate-800 rounded shrink-0" />
+                <div className="size-11 rounded-lg bg-slate-800 shrink-0" />
+                <div className="space-y-1.5 min-w-0 flex-1 pr-4">
+                  <div className="h-3.5 bg-slate-800 rounded w-2/3" />
+                  <div className="h-2.5 bg-slate-800/60 rounded w-1/3" />
+                </div>
+              </div>
+              <div className="w-12 h-3 bg-slate-800/60 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
 
       <div className="space-y-1.5">
         {tracks.slice(0, 10).map((track, index) => {
@@ -107,7 +148,7 @@ export function TopSongsList({
                     e.stopPropagation();
                     onToggleFavorite(track.id);
                   }}
-                  className="flex size-9 items-center justify-center rounded-full text-slate-400 hover:text-rose-400 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer"
+                  className="flex size-10 items-center justify-center rounded-full text-slate-400 hover:text-rose-400 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer"
                   aria-label={isFav ? "Hapus dari favorit" : "Tambah ke favorit"}
                 >
                   <Heart
@@ -130,6 +171,7 @@ export function TopSongsList({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

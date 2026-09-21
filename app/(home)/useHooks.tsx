@@ -42,9 +42,70 @@ export function useHome() {
   const [recentTracks, setRecentTracks] = useState<Track[]>(
     INITIAL_RECENT_TRACKS,
   );
-  const [topSongs, setTopSongs] = useState<Track[]>(INITIAL_TOP_SONGS);
   const [featuredVideos, setFeaturedVideos] =
     useState<VideoItem[]>(INITIAL_VIDEOS);
+
+  // Personalized Recommendations State
+  const [recommendations, setRecommendations] =
+    useState<Track[]>(INITIAL_TOP_SONGS);
+  const [recommendationTitle, setRecommendationTitle] = useState(
+    "Rekomendasi Untuk Anda",
+  );
+  const [recommendationSubtitle, setRecommendationSubtitle] = useState(
+    "Lagu pilihan terpopuler untukmu",
+  );
+  const [recommendationBadge, setRecommendationBadge] = useState<
+    string | undefined
+  >(undefined);
+  const [isRecsLoading, setIsRecsLoading] = useState(false);
+
+  // Fetch recommendations based on listening history or current track
+  const fetchRecommendations = useCallback(
+    async (targetTrack?: Track | null) => {
+      setIsRecsLoading(true);
+      try {
+        const store = useMusicStore.getState();
+        const hasHistory = store.history && store.history.length > 0;
+        const effectiveTrack =
+          targetTrack !== undefined
+            ? targetTrack
+            : hasHistory
+              ? store.history[0]
+              : null;
+
+        const params = new URLSearchParams();
+        if (effectiveTrack) {
+          if (effectiveTrack.youtubeId)
+            params.set("trackId", effectiveTrack.youtubeId);
+          if (effectiveTrack.artist) params.set("artist", effectiveTrack.artist);
+          if (effectiveTrack.title) params.set("title", effectiveTrack.title);
+        }
+
+        const queryString = params.toString();
+        const url = `/api/music/recommendations${queryString ? `?${queryString}` : ""}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.tracks) && data.tracks.length > 0) {
+            setRecommendations(data.tracks);
+            useMusicStore.getState().registerTracks(data.tracks);
+          }
+          if (data.title) setRecommendationTitle(data.title);
+          if (data.subtitle) setRecommendationSubtitle(data.subtitle);
+          if (data.source === "history") {
+            setRecommendationBadge("Berdasarkan Riwayat");
+          } else {
+            setRecommendationBadge(undefined);
+          }
+        }
+      } catch (err) {
+        console.warn("Error fetching recommendations:", err);
+      } finally {
+        setIsRecsLoading(false);
+      }
+    },
+    [],
+  );
 
   // Fetch dynamic home feed from /api/music/home
   const fetchHomeFeed = useCallback(async (genre: string) => {
@@ -59,7 +120,7 @@ export function useHome() {
           setRecentTracks(data.recentTracks);
         }
         if (data.topSongs && data.topSongs.length > 0) {
-          setTopSongs(data.topSongs);
+          setRecommendations(data.topSongs);
         }
         if (data.featuredVideos && data.featuredVideos.length > 0) {
           setFeaturedVideos(data.featuredVideos);
@@ -82,13 +143,13 @@ export function useHome() {
   // Initial load from API on mount
   useEffect(() => {
     let active = true;
-    async function initFeed() {
+    async function initData() {
       try {
+        await fetchRecommendations();
         const res = await fetch("/api/music/home?genre=All%20Genre");
         if (res.ok && active) {
           const data = await res.json();
           if (data.recentTracks?.length) setRecentTracks(data.recentTracks);
-          if (data.topSongs?.length) setTopSongs(data.topSongs);
           if (data.featuredVideos?.length)
             setFeaturedVideos(data.featuredVideos);
 
@@ -104,16 +165,23 @@ export function useHome() {
         console.warn("Initial feed fetch error:", err);
       }
     }
-    initFeed();
+    initData();
     return () => {
       active = false;
     };
-  }, []);
+  }, [fetchRecommendations]);
 
   // Genre selection handler
   const handleGenreSelect = async (genre: string) => {
     setSelectedGenre(genre);
-    await fetchHomeFeed(genre);
+    if (genre === "All Genre") {
+      await fetchRecommendations();
+    } else {
+      setRecommendationTitle(`Lagu Terpopuler ${genre}`);
+      setRecommendationSubtitle(`Pilihan lagu terbaik dalam genre ${genre}`);
+      setRecommendationBadge(undefined);
+      await fetchHomeFeed(genre);
+    }
   };
 
   // Submit search query (navigates to /search?q=...)
@@ -140,7 +208,13 @@ export function useHome() {
     playlists,
     selectedPlaylist,
     recentTracks,
-    topSongs,
+    topSongs: recommendations,
+    recommendations,
+    recommendationTitle,
+    recommendationSubtitle,
+    recommendationBadge,
+    isRecsLoading,
+    handleRefreshRecommendations: () => fetchRecommendations(),
     featuredVideos,
 
     // Modal States & Handlers

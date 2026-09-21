@@ -12,6 +12,7 @@ import {
   VolumeX,
   ListMusic,
   Mic2,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -54,8 +55,15 @@ export function PlayerBar({
   const repeatMode = useMusicStore((state) => state.repeatMode);
   const toggleShuffle = useMusicStore((state) => state.toggleShuffle);
   const cycleRepeatMode = useMusicStore((state) => state.cycleRepeatMode);
+  const favorites = useMusicStore((state) => state.favorites);
+  const toggleFavorite = useMusicStore((state) => state.toggleFavorite);
 
   if (!currentTrack) return null;
+
+  const isFavorite = Boolean(
+    favorites.includes(currentTrack.id) ||
+      (currentTrack.youtubeId && favorites.includes(currentTrack.youtubeId)),
+  );
 
   const formatTime = (secs: number) => {
     if (isNaN(secs) || secs < 0) return "0:00";
@@ -91,13 +99,14 @@ export function PlayerBar({
       {/* Controls Container */}
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         {/* Left: Track Info */}
+        {/* Left: Track Info & Favorite Button */}
         <div className="flex items-center gap-3.5 min-w-0 sm:w-1/3">
           <img
             src={currentTrack.thumbnail}
             alt={currentTrack.title}
             className="size-12 shrink-0 rounded-xl object-cover ring-1 ring-slate-800"
           />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">
               {currentTrack.title}
             </p>
@@ -106,6 +115,26 @@ export function PlayerBar({
               {currentTrack.album && <span> • {currentTrack.album}</span>}
             </p>
           </div>
+
+          {/* Favorite Button */}
+          <button
+            onClick={() => toggleFavorite(currentTrack)}
+            className="flex size-10 items-center justify-center rounded-full text-slate-400 hover:text-rose-400 transition-colors shrink-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500"
+            aria-label={
+              isFavorite
+                ? "Hapus lagu yang sedang diputar dari favorit"
+                : "Tambah lagu yang sedang diputar ke favorit"
+            }
+            title={isFavorite ? "Hapus dari favorit" : "Tambah ke favorit"}
+          >
+            <Heart
+              className={`size-4.5 transition-all ${
+                isFavorite
+                  ? "fill-rose-500 text-rose-500 scale-110"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            />
+          </button>
         </div>
 
         {/* Center: Playback Controls */}

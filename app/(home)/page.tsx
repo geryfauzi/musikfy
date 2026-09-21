@@ -37,7 +37,11 @@ export default function HomePage() {
     playlists,
     selectedPlaylist,
     recentTracks,
-    topSongs,
+    recommendations,
+    recommendationTitle,
+    recommendationSubtitle,
+    recommendationBadge,
+    isRecsLoading,
     featuredVideos,
     isCreatePlaylistOpen,
     setIsCreatePlaylistOpen,
@@ -136,15 +140,19 @@ export default function HomePage() {
 
               {/* Section 2: Two-column split for Top 10 songs & Videos */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                {/* Left Column: Top 10 songs (7 cols on lg) */}
+                {/* Left Column: Personalized Recommendations (7 cols on lg) */}
                 <div className="lg:col-span-7">
                   <TopSongsList
-                    tracks={topSongs}
+                    tracks={recommendations}
+                    title={recommendationTitle}
+                    subtitle={recommendationSubtitle}
+                    badge={recommendationBadge}
+                    isLoading={isRecsLoading}
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favorites={favorites}
                     onSelectTrack={(track) =>
-                      handleSelectTrack(track, topSongs)
+                      handleSelectTrack(track, recommendations)
                     }
                     onToggleFavorite={handleToggleFavorite}
                     onOpenAddToPlaylist={(track) => setAddToPlaylistTrack(track)}
@@ -165,7 +173,7 @@ export default function HomePage() {
                         durationSec: 225,
                         youtubeId: v.youtubeId,
                       };
-                      handleSelectTrack(videoTrack, [videoTrack, ...topSongs]);
+                      handleSelectTrack(videoTrack, [videoTrack, ...recommendations]);
                     }}
                   />
                 </div>
